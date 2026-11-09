@@ -73,13 +73,28 @@ class CodexResponsesLanguageModel implements LanguageModelV3 {
 	doStream(
 		options: Parameters<LanguageModelV3["doStream"]>[0],
 	): ReturnType<LanguageModelV3["doStream"]> {
+		// @ai-sdk/openai 3.0.41 does not recognize the GPT-6 family as reasoning
+		// models. Apply its supported override before it converts the request.
+		if (/^gpt-6(?:[.-]|$)/.test(this.modelId)) {
+			const openaiOptions = options.providerOptions?.openai
+			options = {
+				...options,
+				providerOptions: {
+					...options.providerOptions,
+					openai: {
+						...openaiOptions,
+						forceReasoning: openaiOptions?.forceReasoning ?? true,
+					},
+				},
+			}
+		}
 		return this.model.doStream(options)
 	}
 
 	async doGenerate(
 		options: Parameters<LanguageModelV3["doGenerate"]>[0],
 	): Promise<Awaited<ReturnType<LanguageModelV3["doGenerate"]>>> {
-		const streamResult = await this.model.doStream(options)
+		const streamResult = await this.doStream(options)
 		const reader = streamResult.stream.getReader()
 
 		const content: Array<LanguageModelV3Content> = []
